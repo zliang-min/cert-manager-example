@@ -1,0 +1,120 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  namespace: helloworld
+  name: cert-monitor
+automountServiceAccountToken: true
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: helloworld
+  name: cert-monitor
+rules:
+- apiGroups: ["cert-manager.io"]
+  resources: ["certificates"]
+  verbs: ["*"]
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["get", "update", "patch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+# This role binding allows "jane" to read pods in the "default" namespace.
+# You need to already have a Role named "pod-reader" in that namespace.
+kind: RoleBinding
+metadata:
+  name: cert-monitor
+  namespace: helloworld
+subjects:
+- kind: ServiceAccount
+  name: cert-monitor
+  namespace: helloworld
+  # apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role
+  name: cert-monitor
+  apiGroup: rbac.authorization.k8s.io
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cert-monitor
+rules:
+- apiGroups: ["cert-manager.io"]
+  resources: ["certificates"]
+  verbs: ["*"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+# This cluster role binding allows anyone in the "manager" group to read secrets in any namespace.
+kind: ClusterRoleBinding
+metadata:
+  name: cert-monitor
+subjects:
+- kind: ServiceAccount
+  name: cert-monitor
+  namespace: helloworld
+roleRef:
+  kind: ClusterRole
+  name: cert-monitor
+  apiGroup: rbac.authorization.k8s.io
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cert-monitor
+  namespace: helloworld
+  labels:
+    app: cert-monitor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cert-monitor
+  template:
+    metadata:
+      labels:
+        app: cert-monitor
+    spec:
+      serviceAccountName: cert-monitor
+      containers:
+      - image: localhost:5000/cert-monitor:latest
+        name: cert-monitor
+        env:
+        - name: K8S_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: K8S_CERT_NAME
+          value: helloworld-springboot
+        - name: K8S_DEPLOYMENT_NAME
+          value: helloworld-springboot
+        - name: CERT_ALERT_DURATION_BEFORE_EXPIRE
+          # defines the duration of time when it sends an alert before the cert expires
+          # see: https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/time/Duration.html#parse(java.lang.CharSequence)
+          value: PT25M
+        - name: ALERT_SMTP_HOST
+          value: smtp.gmail.com
+        - name: ALERT_SMTP_PORT
+          value: "587"
+        - name: ALERT_SMTP_AUTH
+          value: "true"
+        - name: ALERT_EMAIL_SENDER
+          valueFrom:
+            secretKeyRef:
+              key: sender
+              name: alert-email-credentials
+        - name: ALERT_EMAIL_SENDER_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: password
+              name: alert-email-credentials
+        - name: ALERT_EMAIL_RECIPIENT
+          valueFrom:
+            secretKeyRef:
+              key: recipient
+              name: alert-email-credentials

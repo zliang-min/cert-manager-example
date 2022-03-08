@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+
+set -e -o pipefail
+
+echo -n "Enter sender email: "
+read sender
+
+echo -n "Enter sender password: "
+read -s password
+
+echo
+echo -n "Enter recipient email: "
+read recipient
+
+sender=`echo -n $sender | tr -d '\r\n'`
+password=`echo -n $password | tr -d '\r\n'`
+recipient=`echo -n $recipient | tr -d '\r\n'`
+
+kubectl -n helloworld create secret generic alert-email-credentials \
+	--from-literal=sender="$sender" \
+	--from-literal=password="$password" \
+	--from-literal=recipient="$recipient"

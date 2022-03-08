@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+docker run --rm -t --network=host alpine ash -c "apk add socat && socat TCP-LISTEN:5000,reuseaddr,fork TCP:host.docker.internal:5000" &
+PID=$!
+echo PID=$PID
+
+trap "echo byebye; kill $PID" SIGINT
+
+kubectl port-forward --namespace kube-system service/registry 5000:80

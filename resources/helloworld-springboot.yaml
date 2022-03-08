@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: helloworld-springboot
+  namespace: helloworld
+  labels:
+    app: helloworld-springboot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: helloworld-springboot
+  template:
+    metadata:
+      labels:
+        app: helloworld-springboot
+    spec:
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+      initContainers:
+      - image: localhost:5000/init-keystore:latest
+        name: init-keystore
+        volumeMounts:
+        - name: certs
+          readOnly: true
+          mountPath: "/mnt/certs"
+        - name: keystore-dir
+          mountPath: "/mnt/keystore"
+      containers:
+      - image: localhost:5000/helloworld:latest
+        name: helloworld
+        volumeMounts:
+        - name: keystore-dir
+          mountPath: "/tmp/certs"
+      volumes:
+      - name: certs
+        secret:
+          secretName: helloworld-springboot
+      - name: keystore-dir
+        emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: helloworld
+  namespace: helloworld
+  labels:
+    app: helloworld-springboot
+spec:
+  ports:
+  - port: 8080
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    app: helloworld-springboot
+  type: LoadBalancer
